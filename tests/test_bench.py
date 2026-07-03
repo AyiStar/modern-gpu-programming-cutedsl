@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from gemm_cutedsl_modal.bench import BenchmarkResult, tflops
-from gemm_cutedsl_modal.profiling import ProfileResult, add_speedups
-from gemm_cutedsl_modal.spec import validate_problem
+from gemm_cutedsl.bench import (
+    BenchmarkResult,
+    CorrectnessResult,
+    _correctness_problem_from_dims,
+    tflops,
+)
+from gemm_cutedsl.profiling import ProfileResult, add_speedups
+from gemm_cutedsl.spec import validate_problem
 
 
 def test_tflops_calculation() -> None:
@@ -34,6 +39,37 @@ def test_benchmark_result_to_dict() -> None:
     data = result.to_dict()
     assert data["arch"] == "h100"
     assert data["latency_ms"] == 0.5
+
+
+def test_correctness_result_to_dict() -> None:
+    result = CorrectnessResult(
+        arch="h100",
+        step=4,
+        m=256,
+        n=384,
+        k=128,
+        gpu_name="NVIDIA H100",
+        capability="9.0",
+        torch_version="2.x",
+        cuda_version="12.x",
+        cute_dsl_version="4.x",
+        max_abs_error=0.0,
+        mean_abs_error=0.0,
+        kernel={"name": "tma_async"},
+    )
+    data = result.to_dict()
+    assert data["step"] == 4
+    assert data["n"] == 384
+
+
+def test_correctness_problem_selection_uses_step_defaults_without_dims() -> None:
+    step4 = _correctness_problem_from_dims(4, None, None, None)
+    step9 = _correctness_problem_from_dims(9, None, None, None)
+    explicit = _correctness_problem_from_dims(3, 512, 512, 512)
+
+    assert (step4.m, step4.n, step4.k) == (256, 384, 128)
+    assert (step9.m, step9.n, step9.k) == (512, 256, 128)
+    assert explicit.a_shape == (512, 512)
 
 
 def test_add_speedups() -> None:

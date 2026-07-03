@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from .exercise_kernels import cute_modules, get_step_kernel
+from .kernels.common import cute_modules
+from .kernels.registry import get_step_kernel
 from .spec import ARCHES, STEP_SPECS, GemmProblem, normalize_arch, validate_problem
 
 ARCH_META = {
@@ -67,7 +68,8 @@ def validate_tensors(step: int, a: object, b: object) -> GemmProblem:
     if not a.is_contiguous() or not b.is_contiguous():
         raise ValueError("A and B must be contiguous tensors")
     if a.shape[1] != b.shape[1]:
-        raise ValueError(f"A[M,K] and B[N,K] must share K; got {a.shape=} and {b.shape=}")
+        msg = f"A[M,K] and B[N,K] must share K; got {a.shape=} and {b.shape=}"
+        raise ValueError(msg)
     return validate_problem(step, int(a.shape[0]), int(b.shape[0]), int(a.shape[1]))
 
 
@@ -97,7 +99,7 @@ def run_gemm(arch: str, step: int, a: object, b: object) -> object:
 
     _cutlass, _cute, from_dlpack, _Float32, _Int32 = cute_modules()
     c = torch.empty(problem.output_shape, device=a.device, dtype=torch.float16)
-    launch_gemm = get_step_kernel(step)
+    launch_gemm = get_step_kernel(arch, step)
     launch_gemm(
         from_dlpack(a, assumed_align=16),
         from_dlpack(b, assumed_align=16),

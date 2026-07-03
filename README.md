@@ -47,29 +47,37 @@ Step 1-9 metadata, and Modal argument handling.  Kernel execution is Modal-only.
 
 ## Where To Write Kernels
 
-Write your exercise kernels in:
+Write H100 exercise kernels in:
 
 ```text
-src/gemm_cutedsl_modal/exercise_kernels.py
-```
-
-That file contains one function per step:
-
-```text
-step1_kernel()
-step2_kernel()
+src/gemm_cutedsl/kernels/h100/step1.py
+src/gemm_cutedsl/kernels/h100/step2.py
 ...
-step9_kernel()
+src/gemm_cutedsl/kernels/h100/step9.py
 ```
 
-Each function currently returns `correctness_kernel()`.  Replace one function at
-a time with your CuTe DSL implementation while following the tutorial.  Do not
-edit `modal_app.py`, `bench.py`, or `profiling.py` for normal kernel exercises;
-those files already handle Modal launch, correctness checks, performance timing,
-and profiler summaries.
+Write B200 exercise kernels in:
+
+```text
+src/gemm_cutedsl/kernels/b200/step1.py
+src/gemm_cutedsl/kernels/b200/step2.py
+...
+src/gemm_cutedsl/kernels/b200/step9.py
+```
+
+Each step file exposes `build_kernel()` and currently returns the shared
+`correctness_launcher()` from `kernels/correctness.py`.  Replace one step file at
+a time with your CuTe DSL implementation while following the tutorial.  For
+example, H100 Step 4 lives in `kernels/h100/step4.py`, while B200 Step 8 lives in
+`kernels/b200/step8.py`.
+
+Do not edit `modal_app.py`, `bench.py`, or `profiling.py` for normal kernel
+exercises; those files already handle Modal launch, correctness checks,
+performance timing, and profiler summaries.
 
 The Step 1-9 shape rules and tutorial metadata live in `spec.py`.  The H100/B200
-metadata shown in benchmark output lives in `kernel.py`.
+metadata shown in benchmark output lives in `kernel.py`, and architecture/step
+dispatch lives in `kernels/registry.py`.
 
 ## Modal Setup
 
@@ -79,22 +87,34 @@ Log in to Modal once:
 modal setup
 ```
 
-Run H100 correctness:
+Run one H100 correctness check:
 
 ```bash
-uv run modal run src/gemm_cutedsl_modal/modal_app.py --gpu h100 --step 1 --m 128 --n 128 --k 64
+uv run modal run src/gemm_cutedsl/modal_app.py \
+  --gpu h100 --step 1 --m 128 --n 128 --k 64 --mode correctness
+```
+
+Run per-step correctness across all steps.  When `M/N/K` are omitted in
+`--mode correctness`, each step uses its own small legal smoke-test shape:
+Step 1 `128x128x64`, Step 2 `128x128x256`, Step 3 `256x256x128`,
+Step 4 `256x384x128`, Step 5 `384x256x128`, Step 6 `384x384x128`,
+Step 7 `512x384x128`, Step 8 `512x512x128`, and Step 9 `512x256x128`.
+
+```bash
+uv run modal run src/gemm_cutedsl/modal_app.py \
+  --gpu h100 --step all --mode correctness
 ```
 
 Run B200 Step 9:
 
 ```bash
-uv run modal run src/gemm_cutedsl_modal/modal_app.py --gpu b200 --step 9 --m 4096 --n 4096 --k 4096
+uv run modal run src/gemm_cutedsl/modal_app.py --gpu b200 --step 9 --m 4096 --n 4096 --k 4096
 ```
 
 Run smoke checks across both GPUs and all steps:
 
 ```bash
-uv run modal run src/gemm_cutedsl_modal/modal_app.py --gpu both --step all --iters 3 --warmup 1
+uv run modal run src/gemm_cutedsl/modal_app.py --gpu both --step all --iters 3 --warmup 1
 ```
 
 ## Performance And Profiling
@@ -102,7 +122,7 @@ uv run modal run src/gemm_cutedsl_modal/modal_app.py --gpu both --step all --ite
 Benchmark one step on B200:
 
 ```bash
-uv run modal run src/gemm_cutedsl_modal/modal_app.py \
+uv run modal run src/gemm_cutedsl/modal_app.py \
   --gpu b200 --step 9 --m 4096 --n 4096 --k 4096 \
   --mode benchmark --warmup 10 --iters 50
 ```
@@ -111,14 +131,14 @@ Benchmark all steps on one GPU.  The JSON output includes `latency_ms`,
 `tflops`, correctness error, kernel metadata, and `speedup_vs_first`:
 
 ```bash
-uv run modal run src/gemm_cutedsl_modal/modal_app.py \
+uv run modal run src/gemm_cutedsl/modal_app.py \
   --gpu b200 --step all --mode benchmark --warmup 5 --iters 20
 ```
 
 Collect a torch profiler summary for one step:
 
 ```bash
-uv run modal run src/gemm_cutedsl_modal/modal_app.py \
+uv run modal run src/gemm_cutedsl/modal_app.py \
   --gpu b200 --step 9 --m 4096 --n 4096 --k 4096 \
   --mode profile --warmup 5 --iters 5 --profile-rows 30
 ```
@@ -126,6 +146,6 @@ uv run modal run src/gemm_cutedsl_modal/modal_app.py \
 Run both benchmark and profiler in one Modal call:
 
 ```bash
-uv run modal run src/gemm_cutedsl_modal/modal_app.py \
+uv run modal run src/gemm_cutedsl/modal_app.py \
   --gpu h100 --step 7 --mode both --warmup 5 --iters 5
 ```

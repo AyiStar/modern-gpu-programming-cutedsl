@@ -11,7 +11,7 @@ PROJECT_SRC = Path(__file__).resolve().parents[1]
 if str(PROJECT_SRC) not in sys.path:
     sys.path.insert(0, str(PROJECT_SRC))
 
-from gemm_cutedsl_modal.spec import normalize_arch, normalize_steps
+from gemm_cutedsl.spec import normalize_arch, normalize_steps  # noqa: E402
 
 try:
     import modal
@@ -72,7 +72,9 @@ def _result_json(results: list[dict[str, Any]]) -> str:
 
 
 if modal is not None:
-    REGISTERED_ARCHES = select_arches(_gpu_arg_from_argv())
+    # Remote Modal containers import this module without the local CLI argv.
+    # Define both functions there so the hydrated qualname always exists.
+    REGISTERED_ARCHES = select_arches(_gpu_arg_from_argv(default="both"))
     image = (
         modal.Image.from_registry(CUDA_IMAGE, add_python=PYTHON_VERSION)
         .apt_install("build-essential", "git")
@@ -81,15 +83,27 @@ if modal is not None:
             "torch>=2.6",
             "nvidia-cutlass-dsl>=4.4.0",
         )
-        .add_local_python_source("gemm_cutedsl_modal")
+        .add_local_python_source("gemm_cutedsl")
     )
     app = modal.App(APP_NAME, image=image)
 
     def _run_arch(arch: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
-        from gemm_cutedsl_modal.bench import run_suite
-        from gemm_cutedsl_modal.profiling import add_speedups, profile_suite
+        from gemm_cutedsl.bench import run_correctness_suite, run_suite
+        from gemm_cutedsl.profiling import add_speedups, profile_suite
 
         mode = payload["mode"]
+        if mode == "correctness":
+            return [
+                result.to_dict()
+                for result in run_correctness_suite(
+                    arch,
+                    tuple(payload["steps"]),
+                    m=payload["m"],
+                    n=payload["n"],
+                    k=payload["k"],
+                    seed=payload["seed"],
+                )
+            ]
         if mode == "benchmark":
             benchmark_results = run_suite(
                 arch,
@@ -143,7 +157,7 @@ if modal is not None:
                 )
             ]
             return [{"benchmark": add_speedups(benchmark_results), "profile": profiles}]
-        raise ValueError("mode must be one of: benchmark, profile, both")
+        raise ValueError("mode must be one of: correctness, benchmark, profile, both")
 
     if "h100" in REGISTERED_ARCHES:
 
@@ -186,12 +200,14 @@ if modal is not None:
             if arch == "h100":
                 fn = globals().get("run_h100")
                 if fn is None:
-                    raise ValueError("H100 function was not registered; rerun with --gpu h100")
+                    msg = "H100 function was not registered; rerun with --gpu h100"
+                    raise ValueError(msg)
                 all_results.extend(fn.remote(payload))
             elif arch == "b200":
                 fn = globals().get("run_b200")
                 if fn is None:
-                    raise ValueError("B200 function was not registered; rerun with --gpu b200")
+                    msg = "B200 function was not registered; rerun with --gpu b200"
+                    raise ValueError(msg)
                 all_results.extend(fn.remote(payload))
             else:  # pragma: no cover - normalize_arch prevents this branch
                 raise ValueError(f"unsupported arch: {arch}")

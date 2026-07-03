@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from gemm_cutedsl_modal.spec import (
+from gemm_cutedsl.spec import (
     STEP_SPECS,
+    correctness_problem,
     default_problem,
     normalize_arch,
     normalize_steps,
@@ -68,3 +69,20 @@ def test_default_problem_and_overrides() -> None:
     assert default_problem(9).output_shape == (4096, 4096)
     assert problem_from_dims(3, None, None, None).output_shape == (256, 256)
     assert problem_from_dims(3, 512, 512, 512).a_shape == (512, 512)
+
+
+def test_correctness_problem_uses_step_specific_shapes() -> None:
+    expected = {
+        1: (128, 128, 64),
+        2: (128, 128, 256),
+        3: (256, 256, 128),
+        4: (256, 384, 128),
+        5: (384, 256, 128),
+        6: (384, 384, 128),
+        7: (512, 384, 128),
+        8: (512, 512, 128),
+        9: (512, 256, 128),
+    }
+    for step, shape in expected.items():
+        problem = correctness_problem(step)
+        assert (problem.m, problem.n, problem.k) == shape

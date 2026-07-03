@@ -219,7 +219,10 @@ def validate_problem(step: int, m: int, n: int, k: int) -> GemmProblem:
     )
     for name, value, multiple in multiples:
         if value % multiple != 0:
-            msg = f"Step {step} requires {name} to be a multiple of {multiple}; got {value}"
+            msg = (
+                f"Step {step} requires {name} to be a multiple of {multiple}; "
+                f"got {value}"
+            )
             raise ValueError(msg)
     return GemmProblem(step=step, m=m, n=n, k=k)
 
@@ -239,7 +242,33 @@ def default_problem(step: int) -> GemmProblem:
     raise ValueError(msg)
 
 
-def problem_from_dims(step: int, m: int | None, n: int | None, k: int | None) -> GemmProblem:
+def correctness_problem(step: int) -> GemmProblem:
+    """Small legal problem used for per-step accuracy smoke tests."""
+
+    shapes = {
+        1: (128, 128, 64),
+        2: (128, 128, 256),
+        3: (256, 256, 128),
+        4: (256, 384, 128),
+        5: (384, 256, 128),
+        6: (384, 384, 128),
+        7: (512, 384, 128),
+        8: (512, 512, 128),
+        9: (512, 256, 128),
+    }
+    try:
+        m, n, k = shapes[step]
+    except KeyError as exc:
+        raise ValueError(f"invalid step {step!r}; expected 1-9") from exc
+    return validate_problem(step, m, n, k)
+
+
+def problem_from_dims(
+    step: int,
+    m: int | None,
+    n: int | None,
+    k: int | None,
+) -> GemmProblem:
     default = default_problem(step)
     return validate_problem(
         step,

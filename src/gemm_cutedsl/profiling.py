@@ -42,8 +42,18 @@ def _make_inputs(problem: GemmProblem, seed: int) -> tuple[object, object]:
 
     generator = torch.Generator(device="cuda")
     generator.manual_seed(seed)
-    a = torch.randn(problem.a_shape, device="cuda", dtype=torch.float16, generator=generator)
-    b = torch.randn(problem.b_shape, device="cuda", dtype=torch.float16, generator=generator)
+    a = torch.randn(
+        problem.a_shape,
+        device="cuda",
+        dtype=torch.float16,
+        generator=generator,
+    )
+    b = torch.randn(
+        problem.b_shape,
+        device="cuda",
+        dtype=torch.float16,
+        generator=generator,
+    )
     return a.contiguous(), b.contiguous()
 
 
